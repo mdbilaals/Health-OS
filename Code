@@ -1,0 +1,242 @@
+// components/Dashboard.tsx
+'use client';
+
+import React, { useState, useEffect, useMemo } from 'react';
+import { 
+  Activity, Droplets, Utensils, HeartPulse, Scale, Flame, 
+  ChevronRight, AlertTriangle, ShieldCheck, Plus, CheckCircle2 
+} from 'lucide-react';
+import { calculateBMI, calculateEnergyExpenditure, assessGlucoseReading } from '@/lib/healthEngine';
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+
+export interface DashboardMetricState {
+  currentWeight: number;
+  height: number;
+  todayCalories: number;
+  todayProtein: number;
+  todayCarbs: number;
+  todayFats: number;
+  waterIntakeMl: number;
+  activeMinutes: number;
+  latestGlucose: { value: number; context: 'fasting' | 'post_meal_2h' | 'random'; timestamp: string } | null;
+  weightHistory: Array<{ date: string; weight: number }>;
+}
+
+export default function Dashboard() {
+  const [data, setData] = useState<DashboardMetricState>({
+    currentWeight: 88.5,
+    height: 174,
+    todayCalories: 1420,
+    todayProtein: 92,
+    todayCarbs: 165,
+    todayFats: 45,
+    waterIntakeMl: 2250,
+    activeMinutes: 45,
+    latestGlucose: { value: 112, context: 'fasting', timestamp: '08:15 AM' },
+    weightHistory: [
+      { date: 'Mon', weight: 89.2 },
+      { date: 'Tue', weight: 89.0 },
+      { date: 'Wed', weight: 88.8 },
+      { date: 'Thu', weight: 88.7 },
+      { date: 'Fri', weight: 88.5 },
+    ]
+  });
+
+  const bmiData = useMemo(() => calculateBMI(data.currentWeight, data.height), [data.currentWeight, data.height]);
+
+  const targetPlan = useMemo(() => calculateEnergyExpenditure({
+    age: 34,
+    sex: 'male',
+    heightCm: data.height,
+    weightKg: data.currentWeight,
+    activityLevel: 'moderately_active',
+    goal: 'weight_loss'
+  }), [data.currentWeight, data.height]);
+
+  const glucoseAssessment = useMemo(() => {
+    if (!data.latestGlucose) return null;
+    return assessGlucoseReading(data.latestGlucose.value, data.latestGlucose.context);
+  }, [data.latestGlucose]);
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-8 pb-28 md:pb-8 selection:bg-teal-500 selection:text-white">
+      {/* HEADER SECTION */}
+      <header className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span className="text-xs uppercase tracking-widest font-mono text-emerald-400">HealthOS Engine Active</span>
+          </div>
+          <h1 className="text-3xl font-bold tracking-tight text-white">Daily Health Terminal</h1>
+          <p className="text-slate-400 text-sm">Personal biometric feedback & clinical boundary monitoring.</p>
+        </div>
+
+        <div className="flex gap-2">
+          <button className="px-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-sm font-medium hover:bg-slate-800 transition">
+            Export Records
+          </button>
+          <button className="px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white rounded-xl text-sm font-medium transition flex items-center gap-1.5 shadow-lg shadow-teal-900/30">
+            <Plus className="w-4 h-4" /> Quick Log
+          </button>
+        </div>
+      </header>
+
+      {/* CRITICAL ACTION / WARNING BANNER */}
+      {glucoseAssessment?.isActionRequired && (
+        <section className="max-w-6xl mx-auto mb-6 p-4 rounded-2xl bg-amber-950/40 border border-amber-600/50 flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+          <div className="text-sm">
+            <h4 className="font-semibold text-amber-200">Attention Required: Glucose Threshold Advisory</h4>
+            <p className="text-amber-300/80 mt-0.5">{glucoseAssessment.feedback}</p>
+          </div>
+        </section>
+      )}
+
+      {/* METRIC GRID */}
+      <main className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        {/* Weight & BMI Card */}
+        <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800/80 backdrop-blur-xl">
+          <div className="flex justify-between items-start text-slate-400 mb-3">
+            <span className="text-xs font-semibold uppercase tracking-wider">Weight & BMI</span>
+            <Scale className="w-4 h-4 text-teal-400" />
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-3xl font-extrabold text-white">{data.currentWeight}</span>
+            <span className="text-slate-400 text-sm font-medium">kg</span>
+          </div>
+          <div className="mt-3 flex items-center justify-between text-xs pt-3 border-t border-slate-800">
+            <span className="text-slate-400">BMI: <strong className="text-white">{bmiData.bmi}</strong></span>
+            <span className="px-2 py-0.5 rounded-full bg-slate-800 text-teal-300 font-medium">
+              {bmiData.category}
+            </span>
+          </div>
+        </div>
+
+        {/* Energy & Nutrition Progress */}
+        <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800/80 backdrop-blur-xl">
+          <div className="flex justify-between items-start text-slate-400 mb-3">
+            <span className="text-xs font-semibold uppercase tracking-wider">Caloric Budget</span>
+            <Flame className="w-4 h-4 text-amber-500" />
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-3xl font-extrabold text-white">{data.todayCalories}</span>
+            <span className="text-slate-400 text-sm font-medium">/ {targetPlan.calories} kcal</span>
+          </div>
+          <div className="w-full bg-slate-800 h-2 rounded-full mt-3 overflow-hidden">
+            <div 
+              className="bg-amber-500 h-full rounded-full transition-all duration-500" 
+              style={{ width: `${Math.min(100, (data.todayCalories / targetPlan.calories) * 100)}%` }}
+            />
+          </div>
+          <div className="mt-2 flex justify-between text-[11px] text-slate-400">
+            <span>P: {data.todayProtein}g / {targetPlan.proteinGrams}g</span>
+            <span>C: {data.todayCarbs}g</span>
+            <span>F: {data.todayFats}g</span>
+          </div>
+        </div>
+
+        {/* Latest Glucose */}
+        <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800/80 backdrop-blur-xl">
+          <div className="flex justify-between items-start text-slate-400 mb-3">
+            <span className="text-xs font-semibold uppercase tracking-wider">Blood Glucose</span>
+            <HeartPulse className="w-4 h-4 text-rose-400" />
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-3xl font-extrabold text-white">{data.latestGlucose?.value || '--'}</span>
+            <span className="text-slate-400 text-sm font-medium">mg/dL</span>
+          </div>
+          <div className="mt-3 flex items-center justify-between text-xs pt-3 border-t border-slate-800">
+            <span className="text-slate-400 capitalize">{data.latestGlucose?.context.replace('_', ' ')}</span>
+            <span className="text-rose-300 font-medium">
+              {glucoseAssessment?.valueMmolL} mmol/L
+            </span>
+          </div>
+        </div>
+
+        {/* Water Intake */}
+        <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800/80 backdrop-blur-xl">
+          <div className="flex justify-between items-start text-slate-400 mb-3">
+            <span className="text-xs font-semibold uppercase tracking-wider">Hydration</span>
+            <Droplets className="w-4 h-4 text-cyan-400" />
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-3xl font-extrabold text-white">{data.waterIntakeMl}</span>
+            <span className="text-slate-400 text-sm font-medium">/ 3000 mL</span>
+          </div>
+          <div className="w-full bg-slate-800 h-2 rounded-full mt-3 overflow-hidden">
+            <div 
+              className="bg-cyan-500 h-full rounded-full transition-all duration-500" 
+              style={{ width: `${Math.min(100, (data.waterIntakeMl / 3000) * 100)}%` }}
+            />
+          </div>
+          <div className="mt-2 text-right text-[11px] text-slate-400">
+            {3000 - data.waterIntakeMl > 0 ? `${3000 - data.waterIntakeMl} mL remaining` : 'Target Achieved'}
+          </div>
+        </div>
+      </main>
+
+      {/* TREND CHART & INTERACTIVE ANALYTICS */}
+      <section className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 p-6 rounded-3xl bg-slate-900/50 border border-slate-800/80">
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="font-semibold text-slate-200">Weight Trajectory Trend</h3>
+            <span className="text-xs text-slate-400">Active scale sync</span>
+          </div>
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={data.weightHistory}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                <XAxis dataKey="date" stroke="#64748b" textAnchor="middle" />
+                <YAxis domain={['dataMin - 1', 'dataMax + 1']} stroke="#64748b" />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '12px' }}
+                  labelStyle={{ color: '#94a3b8' }}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="weight" 
+                  stroke="#14b8a6" 
+                  strokeWidth={3} 
+                  dot={{ r: 4, fill: '#14b8a6' }} 
+                  activeDot={{ r: 6 }} 
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* CLINICAL SUMMARY CARD */}
+        <div className="p-6 rounded-3xl bg-slate-900/50 border border-slate-800/80 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center gap-2 mb-4">
+              <ShieldCheck className="w-5 h-5 text-teal-400" />
+              <h3 className="font-semibold text-slate-200">Clinical Safeguards</h3>
+            </div>
+            <p className="text-xs text-slate-400 leading-relaxed mb-4">
+              All baseline targets calculate strictly from validated Mifflin-St Jeor formulas. 
+              Carbohydrate and calorie modifications do not constitute individualized medical therapy.
+            </p>
+            <div className="space-y-3">
+              <div className="flex items-center gap-2.5 text-xs text-slate-300">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>Zero arbitrary minimum drop (< 1200 kcal floor enforced)</span>
+              </div>
+              <div className="flex items-center gap-2.5 text-xs text-slate-300">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>Distinct Fasting vs Post-Prandial Stratification</span>
+              </div>
+              <div className="flex items-center gap-2.5 text-xs text-slate-300">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>Strict Decimal Tracking (18.0182 Conversion Factor)</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-6 pt-4 border-t border-slate-800 text-[11px] text-slate-500">
+            Data Source: WHO Adult Ranges & ICMR Macro References.
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
